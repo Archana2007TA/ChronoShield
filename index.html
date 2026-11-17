@@ -1,0 +1,2415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChronoShield | Geospatial Intelligence & Validation Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-canvas: #0B0F19;
+      --glass-bg: rgba(17, 24, 39, 0.85);
+      --glass-bg-strong: rgba(11, 15, 25, 0.92);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --glass-border-hover: rgba(255, 255, 255, 0.22);
+      --text-primary: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --emerald: #10B981;
+      --amber: #F59E0B;
+      --crimson: #EF4444;
+      --cyan: #38BDF8;
+      --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #map {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      background-color: var(--bg-canvas);
+    }
+
+    .leaflet-container {
+      background: var(--bg-canvas);
+      font-family: var(--font-sans);
+    }
+
+    .leaflet-top.leaflet-right {
+      top: 76px;
+      right: 14px;
+      transition: right 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    body.drawer-open .leaflet-top.leaflet-right {
+      right: 438px;
+    }
+
+    .leaflet-control-zoom {
+      border: 1px solid var(--glass-border) !important;
+      border-radius: 10px !important;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
+    }
+
+    .leaflet-control-zoom a {
+      background: var(--glass-bg) !important;
+      backdrop-filter: blur(12px);
+      color: var(--text-primary) !important;
+      border-bottom: 1px solid var(--glass-border) !important;
+      width: 32px !important;
+      height: 32px !important;
+      line-height: 32px !important;
+      font-size: 15px !important;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: rgba(30, 41, 59, 0.95) !important;
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(11, 15, 25, 0.72) !important;
+      color: var(--text-muted) !important;
+      font-size: 10px !important;
+      border-top-left-radius: 6px;
+    }
+
+    .leaflet-control-attribution a {
+      color: var(--text-secondary) !important;
+    }
+
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.48);
+    }
+
+    .telemetry-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 18px;
+      background: rgba(11, 15, 25, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex-shrink: 0;
+    }
+
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(56, 189, 248, 0.22));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.2);
+      flex-shrink: 0;
+    }
+
+    .brand-title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-tag {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--cyan);
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse-ring 1.8s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
+    }
+
+    .kpi-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .kpi-strip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .kpi-pill {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 6px 11px;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      min-width: 130px;
+      flex-shrink: 0;
+    }
+
+    .kpi-pill.alert-pill {
+      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.09);
+    }
+
+    .kpi-pill.variance-pill {
+      border-color: rgba(245, 158, 11, 0.35);
+      background: rgba(245, 158, 11, 0.09);
+    }
+
+    .kpi-label {
+      font-size: 9.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .kpi-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .kpi-pill.alert-pill .kpi-value {
+      color: #FCA5A5;
+    }
+
+    .kpi-pill.variance-pill .kpi-value {
+      color: #FCD34D;
+    }
+
+    .layer-switcher {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--glass-border);
+      border-radius: 9px;
+      padding: 3px;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .layer-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .layer-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .layer-btn.active {
+      color: var(--text-primary);
+      background: rgba(56, 189, 248, 0.16);
+      border: 1px solid rgba(56, 189, 248, 0.38);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
+    }
+
+    .sidebar-left {
+      position: fixed;
+      top: 78px;
+      left: 14px;
+      bottom: 84px;
+      width: 324px;
+      z-index: 900;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar-header {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--glass-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sidebar-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
+    }
+
+    .sidebar-subtitle {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .alert-count-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #FCA5A5;
+    }
+
+    .alerts-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+    }
+
+    .alerts-feed::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .alerts-feed::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 999px;
+    }
+
+    .alert-card {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left: 3px solid var(--crimson);
+      border-radius: 10px;
+      padding: 11px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: transform 0.16s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .alert-card.elevated {
+      border-left-color: var(--amber);
+    }
+
+    .alert-card.selected {
+      background: rgba(30, 41, 59, 0.92);
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2);
+    }
+
+    .alert-card:hover {
+      background: rgba(30, 41, 59, 0.84);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .alert-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .alert-corridor-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.25;
+    }
+
+    .peak-badge {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #FCD34D;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .peak-badge.critical {
+      background: rgba(239, 68, 68, 0.16);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #FCA5A5;
+    }
+
+    .alert-deltas {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .delta-chip {
+      background: rgba(11, 15, 25, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 6px;
+      padding: 5px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .delta-chip-label {
+      font-size: 9.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .delta-chip-val {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .delta-chip-val.hot {
+      color: #FCA5A5;
+    }
+
+    .delta-chip-val.warn {
+      color: #FCD34D;
+    }
+
+    .alert-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .risk-score-inline {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-secondary);
+    }
+
+    .focus-btn {
+      appearance: none;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(56, 189, 248, 0.12);
+      color: #7DD3FC;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.18s ease;
+    }
+
+    .focus-btn:hover {
+      background: rgba(56, 189, 248, 0.24);
+      border-color: rgba(56, 189, 248, 0.6);
+      color: #FFFFFF;
+    }
+
+    .map-legend {
+      position: fixed;
+      bottom: 18px;
+      left: 14px;
+      z-index: 900;
+      border-radius: 10px;
+      padding: 9px 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 324px;
+    }
+
+    .legend-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .legend-bar {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--emerald) 0%, var(--amber) 50%, var(--crimson) 100%);
+    }
+
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .time-slider-dock {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 920;
+      border-radius: 14px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 440px;
+      max-width: calc(100vw - 40px);
+    }
+
+    .play-btn {
+      appearance: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.14);
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.18s ease;
+    }
+
+    .play-btn:hover {
+      background: rgba(56, 189, 248, 0.25);
+      color: #FFFFFF;
+    }
+
+    .play-btn.playing {
+      background: rgba(16, 185, 129, 0.18);
+      border-color: rgba(16, 185, 129, 0.45);
+      color: var(--emerald);
+    }
+
+    .timeline-control {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .timeline-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .timeline-active-tag {
+      font-family: var(--font-mono);
+      color: var(--cyan);
+    }
+
+    .horizon-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.25);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .horizon-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--cyan);
+      border: 2px solid #0B0F19;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .horizon-range::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .horizon-range::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--cyan);
+      border: 2px solid #0B0F19;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+      cursor: pointer;
+    }
+
+    .horizon-steps {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .step-tick {
+      appearance: none;
+      border: none;
+      background: transparent;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .step-tick:hover {
+      color: var(--text-primary);
+    }
+
+    .step-tick.active {
+      color: var(--cyan);
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.12);
+    }
+
+    .drawer-right {
+      position: fixed;
+      top: 78px;
+      right: 14px;
+      bottom: 14px;
+      width: 412px;
+      z-index: 950;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateX(calc(100% + 28px));
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    }
+
+    .drawer-right.open {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .drawer-header {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--glass-border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .drawer-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .drawer-street-name {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+
+    .drawer-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .segment-id-pill {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 2px 7px;
+      border-radius: 5px;
+    }
+
+    .severity-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 2px 8px;
+      border-radius: 5px;
+      text-transform: uppercase;
+    }
+
+    .severity-badge.safe {
+      color: #6EE7B7;
+      background: rgba(16, 185, 129, 0.16);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .severity-badge.elevated {
+      color: #FCD34D;
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .severity-badge.critical {
+      color: #FCA5A5;
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.42);
+    }
+
+    .drawer-close-btn {
+      appearance: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-secondary);
+      font-size: 18px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.18s ease;
+    }
+
+    .drawer-close-btn:hover {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #FCA5A5;
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+    }
+
+    .drawer-body::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .drawer-body::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 999px;
+    }
+
+    .drawer-section {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 11px;
+      padding: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .section-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+    }
+
+    .section-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--cyan);
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 185px;
+      width: 100%;
+    }
+
+    .shap-list {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .shap-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .shap-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .shap-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .shap-reading {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .shap-track {
+      height: 7px;
+      width: 100%;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07);
+      overflow: hidden;
+    }
+
+    .shap-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease;
+    }
+
+    .formula-card {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.55));
+      border: 1px solid rgba(56, 189, 248, 0.24);
+      border-radius: 11px;
+      padding: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .formula-equation-box {
+      background: rgba(11, 15, 25, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 11px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-family: var(--font-mono);
+    }
+
+    .formula-lhs {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .formula-fraction {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-primary);
+    }
+
+    .formula-num {
+      padding: 0 6px 3px;
+      border-bottom: 1px solid var(--text-secondary);
+    }
+
+    .formula-den {
+      padding: 3px 6px 0;
+    }
+
+    .formula-result-box {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .formula-score {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .formula-sub {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: var(--text-muted);
+    }
+
+    .tactical-flag {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    .tactical-flag.critical {
+      background: rgba(239, 68, 68, 0.14);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #FCA5A5;
+    }
+
+    .tactical-flag.elevated {
+      background: rgba(245, 158, 11, 0.14);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #FCD34D;
+    }
+
+    .tactical-flag.safe {
+      background: rgba(16, 185, 129, 0.14);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #6EE7B7;
+    }
+
+    .hover-tooltip {
+      position: fixed;
+      z-index: 1200;
+      pointer-events: none;
+      background: rgba(11, 15, 25, 0.94);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 9px;
+      padding: 9px 12px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+      min-width: 210px;
+      display: none;
+    }
+
+    .tooltip-street {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .tooltip-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3px 12px;
+      font-size: 11px;
+    }
+
+    .tooltip-key {
+      color: var(--text-muted);
+    }
+
+    .tooltip-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-primary);
+      text-align: right;
+    }
+
+    @media (max-width: 1180px) {
+      .telemetry-header {
+        height: auto;
+        flex-wrap: wrap;
+        padding: 10px 14px;
+        gap: 10px;
+      }
+
+      .sidebar-left {
+        top: 116px;
+        width: 280px;
+      }
+
+      .map-legend {
+        width: 280px;
+      }
+
+      .drawer-right {
+        top: 116px;
+        width: 360px;
+      }
+
+      body.drawer-open .leaflet-top.leaflet-right {
+        right: 384px;
+      }
+
+      .leaflet-top.leaflet-right {
+        top: 116px;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .sidebar-left {
+        display: none;
+      }
+
+      .map-legend {
+        display: none;
+      }
+
+      .time-slider-dock {
+        min-width: 310px;
+        width: calc(100vw - 24px);
+      }
+
+      .drawer-right {
+        width: calc(100vw - 24px);
+        left: 12px;
+        right: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <header class="telemetry-header">
+    <div class="brand-group">
+      <div class="brand-logo" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" />
+          <path d="M12 8v4l3 2" stroke="#10B981" />
+        </svg>
+      </div>
+      <div class="brand-title-wrap">
+        <div class="brand-title">
+          ChronoShield
+          <span class="brand-tag">PROOF LENS v2.4</span>
+        </div>
+        <div class="live-badge">
+          <span class="pulse-dot"></span>
+          <span>TESTBED: CENTRAL BENGALURU 5x5KM GRID | MODEL: ST-GNN + LIGHTGBM</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <div class="kpi-pill">
+        <span class="kpi-label">Macro Weather Baseline</span>
+        <span class="kpi-value" id="kpi-macro">31.5°C | AQI 78</span>
+      </div>
+      <div class="kpi-pill alert-pill">
+        <span class="kpi-label">Peak Micro-Spike Detected</span>
+        <span class="kpi-value" id="kpi-peak">37.8°C | PM2.5 164 µg/m³</span>
+      </div>
+      <div class="kpi-pill variance-pill">
+        <span class="kpi-label">Granularity Variance</span>
+        <span class="kpi-value" id="kpi-variance">+6.3°C Δ</span>
+      </div>
+      <div class="kpi-pill">
+        <span class="kpi-label">Model Confidence / F1</span>
+        <span class="kpi-value" id="kpi-f1">0.89 F1</span>
+      </div>
+    </div>
+
+    <div class="layer-switcher" role="group" aria-label="Telemetry Map Layers">
+      <button type="button" class="layer-btn active" data-layer="thermal">Thermal Heat Island (°C)</button>
+      <button type="button" class="layer-btn" data-layer="pm25">Toxic Air Pockets (PM2.5)</button>
+      <button type="button" class="layer-btn" data-layer="baseline">Macro Baseline Comparison</button>
+    </div>
+  </header>
+
+  <aside class="sidebar-left glass-panel">
+    <div class="sidebar-header">
+      <div class="sidebar-title-group">
+        <h2 class="sidebar-title">Vulnerable Corridor Alerts</h2>
+        <span class="sidebar-subtitle" id="alerts-horizon-label">HORIZON: NOW (+0H)</span>
+      </div>
+      <span class="alert-count-badge" id="alert-count">0 ALERTS</span>
+    </div>
+    <div class="alerts-feed" id="alerts-feed"></div>
+  </aside>
+
+  <div class="map-legend glass-panel">
+    <div class="legend-header">
+      <span id="legend-title">Thermal Heat Island Scale</span>
+      <span id="legend-unit">°C</span>
+    </div>
+    <div class="legend-bar"></div>
+    <div class="legend-labels">
+      <span id="legend-min">Safe (&le;32.5°C)</span>
+      <span id="legend-mid">Elevated (34.0°C)</span>
+      <span id="legend-max">Critical (&ge;35.5°C)</span>
+    </div>
+  </div>
+
+  <div class="time-slider-dock glass-panel">
+    <button type="button" class="play-btn" id="play-toggle-btn" title="Play / Pause Forecast Horizon">
+      <svg id="play-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+        <polygon points="6,4 20,12 6,20" />
+      </svg>
+    </button>
+    <div class="timeline-control">
+      <div class="timeline-meta">
+        <span>Predictive Forecast Horizon</span>
+        <span class="timeline-active-tag" id="timeline-active-tag">T+0H (LIVE TELEMETRY)</span>
+      </div>
+      <input type="range" min="0" max="4" step="1" value="0" class="horizon-range" id="horizon-slider" aria-label="Predictive Horizon Slider" />
+      <div class="horizon-steps" id="horizon-steps">
+        <button type="button" class="step-tick active" data-step="0">NOW</button>
+        <button type="button" class="step-tick" data-step="1">+1H</button>
+        <button type="button" class="step-tick" data-step="2">+2H</button>
+        <button type="button" class="step-tick" data-step="3">+3H</button>
+        <button type="button" class="step-tick" data-step="4">+4H</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="drawer-right glass-panel" id="segment-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title-block">
+        <h2 class="drawer-street-name" id="drawer-street-name">Select Corridor</h2>
+        <div class="drawer-meta-row">
+          <span class="segment-id-pill" id="drawer-segment-id">BLR-000</span>
+          <span class="severity-badge elevated" id="drawer-severity-badge">ELEVATED</span>
+        </div>
+      </div>
+      <button type="button" class="drawer-close-btn" id="drawer-close-btn" title="Close Segment Drawer">&times;</button>
+    </div>
+
+    <div class="drawer-body">
+      <section class="drawer-section">
+        <div class="section-header-row">
+          <span class="section-title">Macro vs. Micro Forecast</span>
+          <span class="section-tag" id="chart-metric-tag">THERMAL (°C) · 90% CI</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="forecast-chart"></canvas>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <div class="section-header-row">
+          <span class="section-title">Physical Interaction Breakdown</span>
+          <span class="section-tag">SHAP ATTRIBUTION</span>
+        </div>
+        <div class="shap-list">
+          <div class="shap-item">
+            <div class="shap-top">
+              <span class="shap-name">Traffic Congestion Index</span>
+              <span class="shap-reading" id="shap-traffic-text">--</span>
+            </div>
+            <div class="shap-track">
+              <div class="shap-fill" id="shap-traffic-bar" style="width: 0%;"></div>
+            </div>
+          </div>
+          <div class="shap-item">
+            <div class="shap-top">
+              <span class="shap-name">Concrete Heat Retention (SRI)</span>
+              <span class="shap-reading" id="shap-sri-text">--</span>
+            </div>
+            <div class="shap-track">
+              <div class="shap-fill" id="shap-sri-bar" style="width: 0%;"></div>
+            </div>
+          </div>
+          <div class="shap-item">
+            <div class="shap-top">
+              <span class="shap-name">Tree Canopy Cover (CDI)</span>
+              <span class="shap-reading" id="shap-cdi-text">--</span>
+            </div>
+            <div class="shap-track">
+              <div class="shap-fill" id="shap-cdi-bar" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="formula-card">
+        <div class="section-header-row">
+          <span class="section-title">Calculated Spike Potential</span>
+          <span class="section-tag">&epsilon; = 0.10</span>
+        </div>
+        <div class="formula-equation-box">
+          <div>
+            <div class="formula-lhs">SpikePotential =</div>
+            <div class="formula-sub" id="formula-substituted">(-- &times; --) / (-- + 0.10)</div>
+          </div>
+          <div class="formula-fraction">
+            <span class="formula-num">Traffic &times; SRI</span>
+            <span class="formula-den">CDI + &epsilon;</span>
+          </div>
+          <div class="formula-result-box">
+            <span class="formula-score" id="formula-score">0.00</span>
+            <span class="formula-sub">INDEX</span>
+          </div>
+        </div>
+        <div class="tactical-flag critical" id="tactical-status-flag">
+          <span id="tactical-flag-label">STATUS: CRITICAL LOCK</span>
+          <span id="tactical-flag-action">REROUTE ADVISED</span>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <div class="hover-tooltip" id="map-hover-tooltip">
+    <div class="tooltip-street" id="tt-street">--</div>
+    <div class="tooltip-grid">
+      <span class="tooltip-key">Predicted Temp</span>
+      <span class="tooltip-val" id="tt-temp">--</span>
+      <span class="tooltip-key">PM2.5 Pocket</span>
+      <span class="tooltip-val" id="tt-pm25">--</span>
+      <span class="tooltip-key">Macro Delta</span>
+      <span class="tooltip-val" id="tt-delta">--</span>
+      <span class="tooltip-key">Spike Risk Score</span>
+      <span class="tooltip-val" id="tt-risk">--</span>
+    </div>
+  </div>
+
+  <script>
+    const HORIZON_LABELS = ['NOW', '+1H', '+2H', '+3H', '+4H'];
+    const HORIZON_DESCRIPTIONS = [
+      'T+0H (LIVE TELEMETRY)',
+      'T+1H (ST-GNN INFERENCE)',
+      'T+2H (PEAK CONGESTION WINDOW)',
+      'T+3H (THERMAL LAG WINDOW)',
+      'T+4H (EVENING DISPERSION)'
+    ];
+
+    const MACRO_BASELINES = [
+      { step: 0, label: 'NOW', temp: 31.5, pm25: 58, aqi: 78, f1: 0.89 },
+      { step: 1, label: '+1H', temp: 32.1, pm25: 66, aqi: 94, f1: 0.88 },
+      { step: 2, label: '+2H', temp: 31.8, pm25: 79, aqi: 118, f1: 0.87 },
+      { step: 3, label: '+3H', temp: 30.6, pm25: 84, aqi: 129, f1: 0.85 },
+      { step: 4, label: '+4H', temp: 29.4, pm25: 72, aqi: 106, f1: 0.84 }
+    ];
+
+    const BENGALURU_GEOJSON = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-SLK-01',
+            name: 'Silk Board Junction',
+            corridorType: 'Multi-Tier Flyover Bottleneck',
+            sri: 0.91,
+            cdi: 0.08,
+            traffic: [0.86, 0.92, 0.96, 0.94, 0.84],
+            temp: [36.8, 37.9, 38.4, 37.5, 35.4],
+            pm25: [148, 172, 196, 188, 152],
+            tempCI: [0.5, 0.7, 0.9, 1.0, 1.2],
+            pm25CI: [8, 11, 14, 16, 18],
+            risk: [0.86, 0.93, 0.97, 0.94, 0.82]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.6152, 12.9178],
+              [77.6228, 12.9175],
+              [77.6295, 12.9188]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-KRM-02',
+            name: 'KR Market Flyover Corridor',
+            corridorType: 'High-Density Asphalt Canyon',
+            sri: 0.89,
+            cdi: 0.09,
+            traffic: [0.84, 0.90, 0.93, 0.88, 0.76],
+            temp: [36.2, 37.3, 37.8, 36.6, 34.5],
+            pm25: [142, 160, 178, 169, 134],
+            tempCI: [0.5, 0.6, 0.8, 1.0, 1.1],
+            pm25CI: [7, 10, 13, 15, 16],
+            risk: [0.83, 0.90, 0.94, 0.88, 0.75]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.5702, 12.9624],
+              [77.5754, 12.9636],
+              [77.5808, 12.9648]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-ORR-03',
+            name: 'Outer Ring Road (Bellandur)',
+            corridorType: 'IT Arterial Freight Corridor',
+            sri: 0.86,
+            cdi: 0.14,
+            traffic: [0.78, 0.88, 0.95, 0.91, 0.81],
+            temp: [35.4, 36.7, 37.5, 36.4, 34.1],
+            pm25: [128, 154, 184, 176, 141],
+            tempCI: [0.6, 0.7, 0.9, 1.1, 1.2],
+            pm25CI: [8, 11, 15, 16, 17],
+            risk: [0.76, 0.86, 0.93, 0.89, 0.74]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.6512, 12.9234],
+              [77.6624, 12.9261],
+              [77.6746, 12.9289]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-MRT-04',
+            name: 'Marathahalli Bridge',
+            corridorType: 'Signalized Ring Junction',
+            sri: 0.87,
+            cdi: 0.11,
+            traffic: [0.80, 0.89, 0.92, 0.87, 0.75],
+            temp: [35.6, 36.8, 37.2, 36.0, 33.8],
+            pm25: [134, 158, 174, 162, 128],
+            tempCI: [0.5, 0.7, 0.8, 1.0, 1.2],
+            pm25CI: [8, 10, 14, 15, 16],
+            risk: [0.78, 0.87, 0.91, 0.84, 0.71]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.6962, 12.9568],
+              [77.7014, 12.9564],
+              [77.7068, 12.9573]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-HBL-05',
+            name: 'Hebbal Flyover',
+            corridorType: 'Airport Highway Convergence',
+            sri: 0.84,
+            cdi: 0.16,
+            traffic: [0.75, 0.84, 0.89, 0.85, 0.72],
+            temp: [34.9, 36.1, 36.6, 35.3, 33.2],
+            pm25: [118, 141, 161, 152, 119],
+            tempCI: [0.5, 0.7, 0.9, 1.0, 1.1],
+            pm25CI: [7, 10, 13, 14, 15],
+            risk: [0.71, 0.80, 0.86, 0.79, 0.65]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.5906, 13.0414],
+              [77.5918, 13.0445],
+              [77.5931, 13.0476]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-MJS-06',
+            name: 'Majestic Transit Corridor',
+            corridorType: 'Diesel Bus Terminal Canyon',
+            sri: 0.88,
+            cdi: 0.12,
+            traffic: [0.85, 0.89, 0.91, 0.86, 0.77],
+            temp: [35.9, 36.9, 37.3, 36.1, 34.0],
+            pm25: [139, 157, 169, 158, 129],
+            tempCI: [0.5, 0.6, 0.8, 0.9, 1.1],
+            pm25CI: [8, 10, 12, 14, 15],
+            risk: [0.81, 0.88, 0.90, 0.83, 0.72]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.5712, 12.9788],
+              [77.5746, 12.9765],
+              [77.5789, 12.9752]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-RMC-07',
+            name: 'Richmond Circle',
+            corridorType: 'Elevated Flyover Loop',
+            sri: 0.81,
+            cdi: 0.21,
+            traffic: [0.72, 0.80, 0.84, 0.78, 0.64],
+            temp: [34.4, 35.5, 35.9, 34.7, 32.5],
+            pm25: [106, 126, 142, 132, 102],
+            tempCI: [0.4, 0.6, 0.8, 0.9, 1.0],
+            pm25CI: [6, 9, 11, 13, 14],
+            risk: [0.64, 0.74, 0.79, 0.70, 0.54]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.5945, 12.9666],
+              [77.5986, 12.9652],
+              [77.6036, 12.9647]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-MGR-08',
+            name: 'MG Road',
+            corridorType: 'Metro Viaduct Commercial Spine',
+            sri: 0.76,
+            cdi: 0.28,
+            traffic: [0.68, 0.74, 0.79, 0.75, 0.63],
+            temp: [33.8, 34.8, 35.2, 34.0, 32.0],
+            pm25: [92, 110, 124, 116, 91],
+            tempCI: [0.4, 0.5, 0.7, 0.8, 1.0],
+            pm25CI: [6, 8, 10, 12, 13],
+            risk: [0.56, 0.64, 0.71, 0.63, 0.48]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.6002, 12.9756],
+              [77.6067, 12.9746],
+              [77.6134, 12.9733],
+              [77.6198, 12.9729]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-BRG-09',
+            name: 'Brigade Road',
+            corridorType: 'High-Footfall Retail Street',
+            sri: 0.78,
+            cdi: 0.24,
+            traffic: [0.66, 0.73, 0.81, 0.79, 0.69],
+            temp: [33.9, 34.9, 35.5, 34.4, 32.3],
+            pm25: [94, 112, 129, 122, 98],
+            tempCI: [0.4, 0.6, 0.7, 0.8, 0.9],
+            pm25CI: [6, 8, 11, 12, 13],
+            risk: [0.57, 0.66, 0.73, 0.67, 0.52]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.6067, 12.9751],
+              [77.6071, 12.9718],
+              [77.6075, 12.9681]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-IND-10',
+            name: 'Indiranagar 100ft Rd',
+            corridorType: 'Mixed Commercial Arterial',
+            sri: 0.72,
+            cdi: 0.34,
+            traffic: [0.62, 0.71, 0.77, 0.74, 0.61],
+            temp: [33.4, 34.3, 34.7, 33.6, 31.6],
+            pm25: [84, 102, 117, 109, 86],
+            tempCI: [0.4, 0.5, 0.7, 0.8, 0.9],
+            pm25CI: [5, 7, 10, 11, 12],
+            risk: [0.49, 0.58, 0.65, 0.57, 0.44]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.6406, 12.9818],
+              [77.6408, 12.9752],
+              [77.6409, 12.9685],
+              [77.6392, 12.9625]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-KOR-11',
+            name: 'Koramangala 80ft Rd',
+            corridorType: 'Dense Urban Grid Connector',
+            sri: 0.74,
+            cdi: 0.31,
+            traffic: [0.67, 0.75, 0.82, 0.76, 0.62],
+            temp: [33.7, 34.7, 35.1, 33.9, 31.8],
+            pm25: [89, 108, 125, 115, 89],
+            tempCI: [0.4, 0.6, 0.7, 0.8, 1.0],
+            pm25CI: [6, 8, 10, 11, 12],
+            risk: [0.54, 0.63, 0.70, 0.61, 0.46]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.6245, 12.9428],
+              [77.6274, 12.9382],
+              [77.6305, 12.9336]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-MKH-12',
+            name: 'Mekhri Circle',
+            corridorType: 'Underpass Merging Bottleneck',
+            sri: 0.79,
+            cdi: 0.26,
+            traffic: [0.71, 0.79, 0.84, 0.78, 0.65],
+            temp: [34.2, 35.2, 35.6, 34.4, 32.2],
+            pm25: [98, 118, 134, 124, 95],
+            tempCI: [0.5, 0.6, 0.8, 0.9, 1.0],
+            pm25CI: [6, 9, 11, 12, 13],
+            risk: [0.61, 0.71, 0.76, 0.68, 0.51]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.5816, 13.0124],
+              [77.5852, 13.0126],
+              [77.5892, 13.0132]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-RES-13',
+            name: 'Residency Road',
+            corridorType: 'Central Institutional Corridor',
+            sri: 0.69,
+            cdi: 0.36,
+            traffic: [0.59, 0.66, 0.71, 0.65, 0.52],
+            temp: [33.1, 33.9, 34.2, 33.1, 31.2],
+            pm25: [79, 94, 106, 98, 78],
+            tempCI: [0.4, 0.5, 0.6, 0.7, 0.9],
+            pm25CI: [5, 7, 9, 10, 11],
+            risk: [0.44, 0.52, 0.58, 0.49, 0.37]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.5992, 12.9718],
+              [77.6068, 12.9708],
+              [77.6145, 12.9695]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-LBG-14',
+            name: 'Lalbagh Road',
+            corridorType: 'Park-Adjacent Arterial',
+            sri: 0.62,
+            cdi: 0.48,
+            traffic: [0.56, 0.64, 0.68, 0.61, 0.49],
+            temp: [32.4, 33.1, 33.3, 32.2, 30.5],
+            pm25: [71, 84, 95, 89, 72],
+            tempCI: [0.4, 0.5, 0.6, 0.7, 0.8],
+            pm25CI: [5, 6, 8, 9, 10],
+            risk: [0.36, 0.43, 0.48, 0.40, 0.30]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.5818, 12.9562],
+              [77.5868, 12.9574],
+              [77.5918, 12.9588]
+            ]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: {
+            id: 'BLR-CBN-15',
+            name: 'Cubbon Park Perimeter',
+            corridorType: 'High-Canopy Ecological Buffer',
+            sri: 0.34,
+            cdi: 0.78,
+            traffic: [0.36, 0.41, 0.44, 0.39, 0.28],
+            temp: [30.2, 30.8, 30.7, 29.6, 28.4],
+            pm25: [42, 48, 54, 51, 41],
+            tempCI: [0.3, 0.4, 0.5, 0.6, 0.7],
+            pm25CI: [4, 5, 6, 7, 8],
+            risk: [0.14, 0.17, 0.19, 0.15, 0.11]
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [77.5908, 12.9794],
+              [77.5912, 12.9745],
+              [77.5934, 12.9702],
+              [77.5988, 12.9714]
+            ]
+          }
+        }
+      ]
+    };
+
+    const DataService = {
+      USE_MOCK_DATA: true,
+      BASE_URL: '/api/v1',
+
+      async getGridForecast(step) {
+        if (!this.USE_MOCK_DATA) {
+          const response = await fetch(`${this.BASE_URL}/grid/forecast?horizon=${step}`);
+          if (!response.ok) {
+            throw new Error(`Forecast fetch failed: ${response.status}`);
+          }
+          return await response.json();
+        }
+
+        const macro = MACRO_BASELINES[step] || MACRO_BASELINES[0];
+        const features = BENGALURU_GEOJSON.features.map((feature) => {
+          const p = feature.properties;
+          const tempVal = p.temp[step];
+          const pm25Val = p.pm25[step];
+          const trafficVal = p.traffic[step];
+          const riskVal = p.risk[step];
+          const peakIndex = p.risk.indexOf(Math.max(...p.risk));
+
+          return {
+            type: 'Feature',
+            geometry: feature.geometry,
+            properties: {
+              id: p.id,
+              name: p.name,
+              corridorType: p.corridorType,
+              sri: p.sri,
+              cdi: p.cdi,
+              traffic: trafficVal,
+              temp: tempVal,
+              pm25: pm25Val,
+              risk: riskVal,
+              tempDelta: Number((tempVal - macro.temp).toFixed(1)),
+              pm25Delta: Math.round(pm25Val - macro.pm25),
+              peakHorizonStep: peakIndex,
+              peakHorizonLabel: HORIZON_LABELS[peakIndex]
+            }
+          };
+        });
+
+        return {
+          horizonStep: step,
+          horizonLabel: HORIZON_LABELS[step],
+          macroBaseline: macro,
+          geoJson: {
+            type: 'FeatureCollection',
+            features
+          }
+        };
+      },
+
+      async getSegmentAnalytics(id) {
+        if (!this.USE_MOCK_DATA) {
+          const response = await fetch(`${this.BASE_URL}/segment/${encodeURIComponent(id)}/analytics`);
+          if (!response.ok) {
+            throw new Error(`Segment analytics fetch failed: ${response.status}`);
+          }
+          return await response.json();
+        }
+
+        const feature = BENGALURU_GEOJSON.features.find((f) => f.properties.id === id);
+        if (!feature) {
+          throw new Error(`Segment ${id} not found`);
+        }
+
+        const p = feature.properties;
+        const tempSeries = p.temp.map((val, idx) => ({
+          step: idx,
+          label: HORIZON_LABELS[idx],
+          micro: val,
+          macro: MACRO_BASELINES[idx].temp,
+          lower: Number((val - p.tempCI[idx]).toFixed(1)),
+          upper: Number((val + p.tempCI[idx]).toFixed(1))
+        }));
+
+        const pm25Series = p.pm25.map((val, idx) => ({
+          step: idx,
+          label: HORIZON_LABELS[idx],
+          micro: val,
+          macro: MACRO_BASELINES[idx].pm25,
+          lower: Math.max(10, val - p.pm25CI[idx]),
+          upper: val + p.pm25CI[idx]
+        }));
+
+        return {
+          id: p.id,
+          name: p.name,
+          corridorType: p.corridorType,
+          sri: p.sri,
+          cdi: p.cdi,
+          trafficByStep: p.traffic,
+          riskByStep: p.risk,
+          tempSeries,
+          pm25Series
+        };
+      }
+    };
+
+    const appState = {
+      horizon: 0,
+      activeLayer: 'thermal',
+      selectedSegmentId: null,
+      isPlaying: false,
+      playTimer: null,
+      currentForecast: null,
+      currentAnalytics: null,
+      map: null,
+      geoJsonLayer: null,
+      haloLayer: null,
+      layerById: new Map(),
+      chartInstance: null
+    };
+
+    function getRiskColorByScore(score) {
+      if (score >= 0.70) return '#EF4444';
+      if (score >= 0.42) return '#F59E0B';
+      return '#10B981';
+    }
+
+    function getSegmentVisualColor(props) {
+      if (appState.activeLayer === 'thermal') {
+        if (props.temp >= 35.5) return '#EF4444';
+        if (props.temp >= 32.6) return '#F59E0B';
+        return '#10B981';
+      }
+      if (appState.activeLayer === 'pm25') {
+        if (props.pm25 >= 116) return '#EF4444';
+        if (props.pm25 >= 66) return '#F59E0B';
+        return '#10B981';
+      }
+      if (props.tempDelta >= 3.9) return '#EF4444';
+      if (props.tempDelta >= 1.6) return '#F59E0B';
+      return '#10B981';
+    }
+
+    function getSeverityTier(riskScore) {
+      if (riskScore >= 0.70) return 'critical';
+      if (riskScore >= 0.42) return 'elevated';
+      return 'safe';
+    }
+
+    function formatSignedDelta(value, unit) {
+      const sign = value >= 0 ? '+' : '';
+      return `${sign}${value}${unit}`;
+    }
+
+    function initMap() {
+      appState.map = L.map('map', {
+        center: [12.9716, 77.5946],
+        zoom: 14,
+        zoomControl: false,
+        preferCanvas: true
+      });
+
+      L.control.zoom({ position: 'topright' }).addTo(appState.map);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(appState.map);
+    }
+
+    function showTooltip(event, props) {
+      const tooltip = document.getElementById('map-hover-tooltip');
+      document.getElementById('tt-street').textContent = props.name;
+      document.getElementById('tt-temp').textContent = `${props.temp.toFixed(1)}°C`;
+      document.getElementById('tt-pm25').textContent = `${props.pm25} µg/m³`;
+      document.getElementById('tt-delta').textContent = `${formatSignedDelta(props.tempDelta, '°C')} | ${formatSignedDelta(props.pm25Delta, ' µg/m³')}`;
+
+      const riskEl = document.getElementById('tt-risk');
+      riskEl.textContent = props.risk.toFixed(2);
+      riskEl.style.color = getRiskColorByScore(props.risk);
+
+      tooltip.style.display = 'block';
+      positionTooltip(event.originalEvent);
+    }
+
+    function positionTooltip(mouseEvent) {
+      const tooltip = document.getElementById('map-hover-tooltip');
+      if (!mouseEvent || tooltip.style.display === 'none') return;
+      const offsetX = 16;
+      const offsetY = 16;
+      const rect = tooltip.getBoundingClientRect();
+      let left = mouseEvent.clientX + offsetX;
+      let top = mouseEvent.clientY + offsetY;
+      if (left + rect.width > window.innerWidth - 12) {
+        left = mouseEvent.clientX - rect.width - offsetX;
+      }
+      if (top + rect.height > window.innerHeight - 12) {
+        top = mouseEvent.clientY - rect.height - offsetY;
+      }
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    }
+
+    function hideTooltip() {
+      document.getElementById('map-hover-tooltip').style.display = 'none';
+    }
+
+    function renderMapLayers() {
+      if (!appState.currentForecast) return;
+
+      if (appState.haloLayer) {
+        appState.map.removeLayer(appState.haloLayer);
+      }
+      if (appState.geoJsonLayer) {
+        appState.map.removeLayer(appState.geoJsonLayer);
+      }
+
+      appState.layerById.clear();
+
+      if (appState.activeLayer === 'baseline') {
+        appState.haloLayer = L.geoJSON(appState.currentForecast.geoJson, {
+          interactive: false,
+          style: () => ({
+            color: '#64748B',
+            weight: 10,
+            opacity: 0.32,
+            dashArray: '6 6',
+            lineCap: 'round'
+          })
+        }).addTo(appState.map);
+      }
+
+      appState.geoJsonLayer = L.geoJSON(appState.currentForecast.geoJson, {
+        style: (feature) => {
+          const props = feature.properties;
+          const isSelected = props.id === appState.selectedSegmentId;
+          return {
+            color: getSegmentVisualColor(props),
+            weight: isSelected ? 8 : 5,
+            opacity: isSelected ? 1 : 0.88,
+            lineCap: 'round',
+            lineJoin: 'round'
+          };
+        },
+        onEachFeature: (feature, layer) => {
+          const props = feature.properties;
+          appState.layerById.set(props.id, layer);
+
+          layer.on('mouseover', (e) => {
+            layer.setStyle({
+              weight: props.id === appState.selectedSegmentId ? 9 : 8,
+              opacity: 1
+            });
+            showTooltip(e, props);
+          });
+
+          layer.on('mousemove', (e) => {
+            positionTooltip(e.originalEvent);
+          });
+
+          layer.on('mouseout', () => {
+            const isSelected = props.id === appState.selectedSegmentId;
+            layer.setStyle({
+              weight: isSelected ? 8 : 5,
+              opacity: isSelected ? 1 : 0.88
+            });
+            hideTooltip();
+          });
+
+          layer.on('click', () => {
+            openSegmentDrawer(props.id, false);
+          });
+        }
+      }).addTo(appState.map);
+    }
+
+    function updateKPIs() {
+      const forecast = appState.currentForecast;
+      if (!forecast) return;
+
+      const macro = forecast.macroBaseline;
+      const features = forecast.geoJson.features;
+
+      let peakTemp = -Infinity;
+      let peakPm25 = -Infinity;
+      let maxTempDelta = -Infinity;
+      let maxPm25Delta = -Infinity;
+
+      features.forEach((f) => {
+        const p = f.properties;
+        if (p.temp > peakTemp) peakTemp = p.temp;
+        if (p.pm25 > peakPm25) peakPm25 = p.pm25;
+        if (p.tempDelta > maxTempDelta) maxTempDelta = p.tempDelta;
+        if (p.pm25Delta > maxPm25Delta) maxPm25Delta = p.pm25Delta;
+      });
+
+      document.getElementById('kpi-macro').textContent = `${macro.temp.toFixed(1)}°C | AQI ${macro.aqi}`;
+      document.getElementById('kpi-peak').textContent = `${peakTemp.toFixed(1)}°C | PM2.5 ${peakPm25} µg/m³`;
+
+      if (appState.activeLayer === 'pm25') {
+        document.getElementById('kpi-variance').textContent = `+${maxPm25Delta} µg/m³ Δ`;
+      } else {
+        document.getElementById('kpi-variance').textContent = `+${maxTempDelta.toFixed(1)}°C Δ`;
+      }
+
+      document.getElementById('kpi-f1').textContent = `${macro.f1.toFixed(2)} F1`;
+    }
+
+    function updateLegend() {
+      const titleEl = document.getElementById('legend-title');
+      const unitEl = document.getElementById('legend-unit');
+      const minEl = document.getElementById('legend-min');
+      const midEl = document.getElementById('legend-mid');
+      const maxEl = document.getElementById('legend-max');
+
+      if (appState.activeLayer === 'thermal') {
+        titleEl.textContent = 'Thermal Heat Island Scale';
+        unitEl.textContent = '°C';
+        minEl.textContent = 'Safe (<=32.5°C)';
+        midEl.textContent = 'Elevated (34.0°C)';
+        maxEl.textContent = 'Critical (>=35.5°C)';
+      } else if (appState.activeLayer === 'pm25') {
+        titleEl.textContent = 'Toxic PM2.5 Concentration';
+        unitEl.textContent = 'µg/m³';
+        minEl.textContent = 'Safe (<=65)';
+        midEl.textContent = 'Elevated (90)';
+        maxEl.textContent = 'Critical (>=116)';
+      } else {
+        titleEl.textContent = 'Micro vs Macro Variance';
+        unitEl.textContent = 'Δ°C';
+        minEl.textContent = 'Aligned (<=+1.5°C)';
+        midEl.textContent = 'Divergent (+2.7°C)';
+        maxEl.textContent = 'Extreme (>=+3.9°C)';
+      }
+    }
+
+    function renderAlertCards() {
+      const forecast = appState.currentForecast;
+      if (!forecast) return;
+
+      document.getElementById('alerts-horizon-label').textContent = `HORIZON: ${forecast.horizonLabel} · SORTED BY SEVERITY`;
+
+      const vulnerable = forecast.geoJson.features
+        .map((f) => f.properties)
+        .filter((p) => p.risk >= 0.42 || p.temp >= 33.5 || p.pm25 >= 95)
+        .sort((a, b) => b.risk - a.risk);
+
+      document.getElementById('alert-count').textContent = `${vulnerable.length} ALERTS`;
+
+      const feed = document.getElementById('alerts-feed');
+      feed.innerHTML = '';
+
+      vulnerable.forEach((p) => {
+        const tier = getSeverityTier(p.risk);
+        const card = document.createElement('div');
+        card.className = `alert-card ${tier === 'elevated' ? 'elevated' : ''} ${p.id === appState.selectedSegmentId ? 'selected' : ''}`;
+
+        card.innerHTML = `
+          <div class="alert-card-top">
+            <div class="alert-corridor-name">${p.name}</div>
+            <span class="peak-badge ${tier === 'critical' ? 'critical' : ''}">PEAK AT ${p.peakHorizonLabel}</span>
+          </div>
+          <div class="alert-deltas">
+            <div class="delta-chip">
+              <span class="delta-chip-label">Thermal Delta</span>
+              <span class="delta-chip-val ${p.tempDelta >= 3.9 ? 'hot' : 'warn'}">${p.temp.toFixed(1)}°C (${formatSignedDelta(p.tempDelta, '°C')})</span>
+            </div>
+            <div class="delta-chip">
+              <span class="delta-chip-label">PM2.5 Delta</span>
+              <span class="delta-chip-val ${p.pm25Delta >= 60 ? 'hot' : 'warn'}">${p.pm25} (${formatSignedDelta(p.pm25Delta, '')})</span>
+            </div>
+          </div>
+          <div class="alert-card-footer">
+            <span class="risk-score-inline">RISK SCORE: <strong>${p.risk.toFixed(2)}</strong></span>
+            <button type="button" class="focus-btn" data-focus-id="${p.id}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path>
+              </svg>
+              Focus on Map
+            </button>
+          </div>
+        `;
+
+        card.querySelector('.focus-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          openSegmentDrawer(p.id, true);
+        });
+
+        card.addEventListener('click', () => {
+          openSegmentDrawer(p.id, true);
+        });
+
+        feed.appendChild(card);
+      });
+    }
+
+    function renderForecastChart(analytics) {
+      const ctx = document.getElementById('forecast-chart').getContext('2d');
+      const isPmMode = appState.activeLayer === 'pm25';
+      const series = isPmMode ? analytics.pm25Series : analytics.tempSeries;
+
+      document.getElementById('chart-metric-tag').textContent = isPmMode
+        ? 'PM2.5 (µg/m³) · 90% CI'
+        : 'THERMAL (°C) · 90% CI';
+
+      const labels = series.map((d) => d.label);
+      const upperData = series.map((d) => d.upper);
+      const lowerData = series.map((d) => d.lower);
+      const macroData = series.map((d) => d.macro);
+      const microData = series.map((d) => d.micro);
+
+      const currentRisk = analytics.riskByStep[appState.horizon];
+      const neonColor = getRiskColorByScore(currentRisk);
+      const bandFill = currentRisk >= 0.70
+        ? 'rgba(239, 68, 68, 0.16)'
+        : currentRisk >= 0.42
+          ? 'rgba(245, 158, 11, 0.16)'
+          : 'rgba(16, 185, 129, 0.16)';
+
+      const pointRadii = series.map((_, idx) => (idx === appState.horizon ? 6 : 3));
+      const pointBg = series.map((_, idx) => (idx === appState.horizon ? '#FFFFFF' : neonColor));
+
+      if (appState.chartInstance) {
+        appState.chartInstance.destroy();
+      }
+
+      appState.chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Upper 90% CI',
+              data: upperData,
+              borderColor: 'transparent',
+              backgroundColor: bandFill,
+              pointRadius: 0,
+              fill: '+1',
+              tension: 0.35
+            },
+            {
+              label: 'Lower 90% CI',
+              data: lowerData,
+              borderColor: 'transparent',
+              pointRadius: 0,
+              fill: false,
+              tension: 0.35
+            },
+            {
+              label: 'Macro Station Baseline',
+              data: macroData,
+              borderColor: '#94A3B8',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              pointRadius: 2.5,
+              pointBackgroundColor: '#94A3B8',
+              fill: false,
+              tension: 0.3
+            },
+            {
+              label: 'ChronoShield Micro Forecast',
+              data: microData,
+              borderColor: neonColor,
+              borderWidth: 2.6,
+              pointRadius: pointRadii,
+              pointBackgroundColor: pointBg,
+              pointBorderColor: neonColor,
+              pointBorderWidth: 2,
+              fill: false,
+              tension: 0.35
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              labels: {
+                color: '#94A3B8',
+                font: {
+                  family: "'Inter', sans-serif",
+                  size: 10
+                },
+                boxWidth: 14,
+                filter: (item) => !item.text.includes('CI')
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(11, 15, 25, 0.94)',
+              borderColor: 'rgba(255, 255, 255, 0.14)',
+              borderWidth: 1,
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
+              bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+              filter: (item) => !item.dataset.label.includes('Lower'),
+              callbacks: {
+                label: (ctxItem) => {
+                  const unit = isPmMode ? ' µg/m³' : '°C';
+                  return ` ${ctxItem.dataset.label}: ${ctxItem.parsed.y}${unit}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              },
+              ticks: {
+                color: '#94A3B8',
+                font: {
+                  family: "'JetBrains Mono', monospace",
+                  size: 10
+                }
+              }
+            },
+            y: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.06)'
+              },
+              ticks: {
+                color: '#94A3B8',
+                font: {
+                  family: "'JetBrains Mono', monospace",
+                  size: 10
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateDrawerExplainability(analytics) {
+      const step = appState.horizon;
+      const traffic = analytics.trafficByStep[step];
+      const sri = analytics.sri;
+      const cdi = analytics.cdi;
+      const risk = analytics.riskByStep[step];
+      const tier = getSeverityTier(risk);
+
+      document.getElementById('drawer-street-name').textContent = analytics.name;
+      document.getElementById('drawer-segment-id').textContent = analytics.id;
+
+      const sevBadge = document.getElementById('drawer-severity-badge');
+      sevBadge.className = `severity-badge ${tier}`;
+      sevBadge.textContent = tier === 'critical'
+        ? `CRITICAL SPIKE · ${risk.toFixed(2)}`
+        : tier === 'elevated'
+          ? `ELEVATED RISK · ${risk.toFixed(2)}`
+          : `SAFE BUFFER · ${risk.toFixed(2)}`;
+
+      const trafficPct = Math.round(traffic * 100);
+      const trafficTag = traffic >= 0.80 ? 'High Stagnation' : traffic >= 0.55 ? 'Moderate Flow' : 'Free Dispersion';
+      document.getElementById('shap-traffic-text').textContent = `${trafficPct}% — ${trafficTag}`;
+      const trafficBar = document.getElementById('shap-traffic-bar');
+      trafficBar.style.width = `${trafficPct}%`;
+      trafficBar.style.backgroundColor = traffic >= 0.80 ? '#EF4444' : traffic >= 0.55 ? '#F59E0B' : '#10B981';
+
+      const sriTag = sri >= 0.82 ? 'Dense Asphalt Canyon' : sri >= 0.60 ? 'Mixed Surface Mass' : 'Permeable Green Zone';
+      document.getElementById('shap-sri-text').textContent = `${sri.toFixed(2)} — ${sriTag}`;
+      const sriBar = document.getElementById('shap-sri-bar');
+      sriBar.style.width = `${Math.round(sri * 100)}%`;
+      sriBar.style.backgroundColor = sri >= 0.82 ? '#EF4444' : sri >= 0.60 ? '#F59E0B' : '#10B981';
+
+      const cdiPct = Math.round(cdi * 100);
+      const cdiTag = cdi <= 0.20 ? 'Severe Shade Deficit' : cdi <= 0.40 ? 'Fragmented Canopy' : 'Strong Canopy Cooling';
+      document.getElementById('shap-cdi-text').textContent = `${cdiPct}% — ${cdiTag}`;
+      const cdiBar = document.getElementById('shap-cdi-bar');
+      cdiBar.style.width = `${cdiPct}%`;
+      cdiBar.style.backgroundColor = cdi <= 0.20 ? '#EF4444' : cdi <= 0.40 ? '#F59E0B' : '#10B981';
+
+      const epsilon = 0.10;
+      const spikePotential = (traffic * sri) / (cdi + epsilon);
+      document.getElementById('formula-substituted').textContent = `(${traffic.toFixed(2)} × ${sri.toFixed(2)}) / (${cdi.toFixed(2)} + 0.10)`;
+
+      const scoreEl = document.getElementById('formula-score');
+      scoreEl.textContent = spikePotential.toFixed(2);
+
+      const flagEl = document.getElementById('tactical-status-flag');
+      const flagLabel = document.getElementById('tactical-flag-label');
+      const flagAction = document.getElementById('tactical-flag-action');
+
+      if (spikePotential >= 2.2) {
+        scoreEl.style.color = '#FCA5A5';
+        flagEl.className = 'tactical-flag critical';
+        flagLabel.textContent = 'STATUS: THERMAL-PM LOCK';
+        flagAction.textContent = 'SIGNAL & REROUTE PRIORITY';
+      } else if (spikePotential >= 0.95) {
+        scoreEl.style.color = '#FCD34D';
+        flagEl.className = 'tactical-flag elevated';
+        flagLabel.textContent = 'STATUS: CANYON ACCUMULATION';
+        flagAction.textContent = 'ACTIVE ADVISORY';
+      } else {
+        scoreEl.style.color = '#6EE7B7';
+        flagEl.className = 'tactical-flag safe';
+        flagLabel.textContent = 'STATUS: CANOPY STABILIZED';
+        flagAction.textContent = 'NOMINAL CORRIDOR';
+      }
+
+      renderForecastChart(analytics);
+    }
+
+    async function openSegmentDrawer(segmentId, flyToSegment) {
+      appState.selectedSegmentId = segmentId;
+      renderMapLayers();
+      renderAlertCards();
+
+      if (flyToSegment) {
+        const targetLayer = appState.layerById.get(segmentId);
+        if (targetLayer) {
+          appState.map.flyToBounds(targetLayer.getBounds(), {
+            paddingTopLeft: [360, 100],
+            paddingBottomRight: [440, 100],
+            maxZoom: 15,
+            duration: 0.95
+          });
+        }
+      }
+
+      const analytics = await DataService.getSegmentAnalytics(segmentId);
+      appState.currentAnalytics = analytics;
+      updateDrawerExplainability(analytics);
+
+      const drawer = document.getElementById('segment-drawer');
+      drawer.classList.add('open');
+      drawer.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('drawer-open');
+    }
+
+    function closeSegmentDrawer() {
+      appState.selectedSegmentId = null;
+      appState.currentAnalytics = null;
+      const drawer = document.getElementById('segment-drawer');
+      drawer.classList.remove('open');
+      drawer.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('drawer-open');
+      renderMapLayers();
+      renderAlertCards();
+    }
+
+    async function setHorizon(step) {
+      appState.horizon = Number(step);
+      document.getElementById('horizon-slider').value = String(appState.horizon);
+      document.getElementById('timeline-active-tag').textContent = HORIZON_DESCRIPTIONS[appState.horizon];
+
+      document.querySelectorAll('.step-tick').forEach((btn) => {
+        btn.classList.toggle('active', Number(btn.dataset.step) === appState.horizon);
+      });
+
+      appState.currentForecast = await DataService.getGridForecast(appState.horizon);
+      renderMapLayers();
+      updateKPIs();
+      updateLegend();
+      renderAlertCards();
+
+      if (appState.currentAnalytics) {
+        updateDrawerExplainability(appState.currentAnalytics);
+      }
+    }
+
+    function setActiveLayer(layerName) {
+      appState.activeLayer = layerName;
+      document.querySelectorAll('.layer-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.layer === layerName);
+      });
+
+      renderMapLayers();
+      updateKPIs();
+      updateLegend();
+
+      if (appState.currentAnalytics) {
+        renderForecastChart(appState.currentAnalytics);
+      }
+    }
+
+    function togglePlay() {
+      const playBtn = document.getElementById('play-toggle-btn');
+      const playIcon = document.getElementById('play-icon');
+
+      if (appState.isPlaying) {
+        clearInterval(appState.playTimer);
+        appState.playTimer = null;
+        appState.isPlaying = false;
+        playBtn.classList.remove('playing');
+        playIcon.innerHTML = '<polygon points="6,4 20,12 6,20" />';
+      } else {
+        appState.isPlaying = true;
+        playBtn.classList.add('playing');
+        playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />';
+        appState.playTimer = setInterval(() => {
+          const nextStep = (appState.horizon + 1) % 5;
+          setHorizon(nextStep);
+        }, 1500);
+      }
+    }
+
+    function bindEvents() {
+      document.querySelectorAll('.layer-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          setActiveLayer(btn.dataset.layer);
+        });
+      });
+
+      const slider = document.getElementById('horizon-slider');
+      slider.addEventListener('input', (e) => {
+        setHorizon(Number(e.target.value));
+      });
+
+      document.querySelectorAll('.step-tick').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          setHorizon(Number(btn.dataset.step));
+        });
+      });
+
+      document.getElementById('play-toggle-btn').addEventListener('click', togglePlay);
+      document.getElementById('drawer-close-btn').addEventListener('click', closeSegmentDrawer);
+    }
+
+    async function bootstrap() {
+      initMap();
+      bindEvents();
+      await setHorizon(0);
+    }
+
+    document.addEventListener('DOMContentLoaded', bootstrap);
+  </script>
+</body>
+</html>
