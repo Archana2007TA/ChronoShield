@@ -1,12 +1,37 @@
-🛡️ ChronoShieldKnowledge-Based Urban Climate Intelligence System & Spatio-Temporal Microclimate Prediction EngineView Live Proof Lens Dashboard • Read Full PRD • Report Bug🌍 OverviewRapidly urbanizing cities experience dangerous street-level heatwaves and toxic particulate ($PM_{2.5}$) pockets that macro-level municipal weather stations fail to detect. ChronoShield bridges this spatial knowledge gap by modeling the non-linear physical interactions between real-time traffic congestion, concrete heat retention, and tree canopy shade—forecasting hyper-local climate anomalies 2 to 4 hours before they peak.🏗️ System ArchitectureChronoShield is engineered across four decoupled layers:[ Layer 1: Edge & Telemetry ] ──▶ OSMnx Urban Road Graph + Opportunistic Mobile Sensor Streams
-              │
-              ▼
-[ Layer 2: Spatial-Temporal ML ] ──▶ Map-Matching + SpikePotential Physics + LightGBM / ST-GNN
-              │
-              ▼
-[ Layer 3: Backend & PostGIS ] ──▶ PostgreSQL/PostGIS Spatial Indexing + Async FastAPI GeoJSON
-              │
-              ▼
-[ Layer 4: Proof Lens Dashboard ] ──▶ Dark-Mode Command Center + Predictive Time-Slider (+1h to +4h)
-1. Edge & Telemetry Ingestion LayerDownloads and partitions a dense urban road network (Central Bengaluru $5\text{km} \times 5\text{km}$ testbed) using OSMnx and NetworkX.Computes static urban morphology metrics per road segment: Tree Canopy Density Index ($CDI$) and Surface Heat Retention Index ($SRI$).Ingests moving vehicle telemetry streams (GPS coordinates, ambient temperature, humidity, $PM_{2.5}$, and velocity vectors).2. Spatial-Temporal Knowledge & ML EngineSnaps moving GPS telemetry onto road graph edges and evaluates physical interaction dynamics:
-$$\text{SpikePotential} = \frac{\text{TrafficCongestion} \times \text{SurfaceRetention}}{\text{CanopyDensity} + \epsilon}$$Forecasts thermal and $PM_{2.5}$ indices across +1h, +2h, +3h, and +4h horizons using LightGBM, Isolation Forest anomaly detection, and graph neural network layers.Provides SHAP feature attribution so urban planners and evaluators can inspect the exact physical drivers behind every predicted spike.3. Backend API & Spatial StorageDatabase: PostgreSQL with PostGIS spatial extensions (GIST indexing) for rapid bounding-box and corridor queries.Endpoints (FastAPI):GET /api/v1/grid/forecast?horizon={step} — Streams GeoJSON road segments annotated with predicted thermal/pollution metrics and risk scores.GET /api/v1/segment/{id}/analytics — Returns macro-vs-micro time-series comparisons and SHAP factor breakdowns for individual street segments.4. Geospatial Intelligence Dashboard ("Proof Lens")Interactive dark-mode geospatial interface built with HTML5, CSS3, JavaScript, Leaflet.js, and Chart.js.Features a Predictive Time-Slider (NOW → +4H), Vulnerable Corridor Alerts, and a Segment Deep-Dive Drawer exposing model explainability.📊 Target Engineering & Model KPIsMetric CategoryTarget BenchmarkDescriptionForecasting Accuracy$\text{RMSE} < 1.1^\circ\text{C}$ & $< 10\ \mu\text{g/m}^3$Precision across +2h and +4h predictive horizons.Anomaly Detection$\text{F1-Score} > 0.85$Precision/recall balance in isolating sudden thermal or toxic surges.Granularity Gain$> 4.0^\circ\text{C}\ \Delta$ uncoveredStreet-level variance captured beyond macro weather station readings.API Latency$< 400\ \text{ms}$End-to-end GeoJSON grid batch re
+# 🌍 ChronoShield
+### High-Rigor Urban Climate Intelligence & Microclimate Prediction Platform
+
+---
+
+## 🚀 Overview
+**ChronoShield** is an advanced spatial-temporal urban climate intelligence system designed to model, simulate, and predict hyper-local microclimate anomalies (such as street-level heatwaves and toxic PM2.5 air pockets) **2 to 4 hours before they peak**. 
+
+Standard macro-level weather stations fail to capture street-level thermal variations caused by traffic congestion, concrete heat retention, and urban density. ChronoShield bridges this knowledge gap by fusing moving mobile telemetry with static urban morphology on a directed spatial road graph.
+
+---
+
+## 🏗️ System Architecture & Decoupled Layers
+
+1. **Layer 1: Edge & Telemetry Ingestion:** Uses `OSMnx` to build a directed road network graph, binding static morphology attributes (Tree Canopy Density Index, Surface Albedo/Heat Retention) and simulating opportunistic mobile sensor streams.
+2. **Layer 2: Spatial-Temporal ML Engine:** Implements map-matching, non-linear physical interaction feature engineering (`SpikePotential`), and predictive forecasting (`LightGBM` + `Isolation Forest` + `ST-GNN`).
+3. **Layer 3: Backend API & Streaming Pipeline:** Built with `FastAPI` and backed by `PostgreSQL` + `PostGIS` to serve high-performance GeoJSON spatial predictions and telemetry analytics.
+4. **Layer 4: Geospatial Validation Dashboard:** An interactive command-center web interface featuring a multi-horizon predictive time-slider, vulnerable corridor alerts, and macro-vs-micro model explainability charts.
+
+---
+
+## 🛠️ Technology Stack
+
+* **Core Intelligence & Backend:** Python 3, FastAPI, GeoPandas, Shapely, OSMnx, NetworkX, LightGBM, Scikit-learn, PyTorch.
+* **Spatial Storage & Database:** PostgreSQL, PostGIS (spatial indexing & geometric queries).
+* **Frontend Visualization:** HTML5, CSS3, Modern JavaScript (ES6+), Leaflet.js, Chart.js.
+* **Edge Hardware (Optional):** C / C++ (ESP32 microcontrollers for physical sensor node prototyping).
+
+---
+
+## 📂 Repository Structure
+
+```text
+ChronoShield/
+├── PRD.md                 # Official Product Requirements Document
+├── README.md              # Project documentation & overview
+├── index.html             # Interactive Geospatial Intelligence Dashboard (MVP)
